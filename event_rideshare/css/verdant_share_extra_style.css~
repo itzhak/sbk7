@@ -1,0 +1,70 @@
+
+/* <fieldset id="edit-locations-0" class="location form-wrapper"> */
+/* #block-verdant-share-rideshares
+ * #edit-locations-0
+*/
+.form-item-locations-0-delete-location {
+	display: none;    
+	  /* delete the location checkbox
+		   not sure about removing it, but think so */
+}
+
+/*** Remove longitude and latitude reading / hand-entry ***/
+#block-verdant-share-rideshares div.form-item-locations-0-locpick-user-longitude,
+#block-verdant-share-rideshares div.form-item-locations-0-locpick-user-latitude {
+	display: none;
+}
+/* change this to fit your sidebar width */
+#verdant_rideshare #edit-locations-0-province,
+#verdant_rideshare #edit-locations-0-country ,
+#verdant_rideshare input.form-text {
+	width: 16em;   /* adjust to your sidebar block width */  
+	clear: left;
+}
+
+/* Clean up date */
+#verdant_rideshare input#edit-field-arrival-time-und-0-value-datepicker-popup-0 ,
+#verdant_rideshare input#edit-field-departure-time-und-0-value-datepicker-popup-0 {
+	width: 7em;
+	clear: none;
+}
+/* big enough for date and time on same line -- 
+ * this is just my personal pref, have fun */
+#edit-field-arrival-time-und-0-value,
+#edit-field-departure-time-und-0-value {
+	width: 14em;
+}
+
+.form-item-field-arrival-time-und-0-value-date,
+.form-item-field-departure-time-und-0-value-date {
+	float: left;
+}
+#verdant_rideshare input#edit-field-arrival-time-und-0-value-timeEntry-popup-1,
+#verdant_rideshare input#edit-field-departure-time-und-0-value-timeEntry-popup-1{
+	width: 4em;
+}
+
+/* remove the summary of the lat/long position */
+#verdant_rideshare .location-current-coordinates-fieldset {
+	display: none;
+}
+
+
+/* removing latitude tools surprisingly difficult, other form changes
+ * done in module */
+#verdant_rideshare #gmap-auto2map-locpick_latitude0-wrapper,
+#verdant_rideshare div.description,
+#verdant_rideshare #gmap-auto2map-locpick_longitude0-wrapper {
+	  display: none; /* If you wish to supply your own latitude and longitude ... */
+}
+#gmap-auto1map-locpick_longitude0-wrapper,
+#gmap-auto1map-locpick_latitude0-wrapper {
+	display: none;
+}
+
+/* highlight the contact link */
+div.rideshare-contact-link {
+	font-size: 1.1em;
+	font-weight: bold;
+}
+

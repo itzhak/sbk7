@@ -1,0 +1,594 @@
+<?php
+// $Id: $
+
+/********** Misc setup  ************************************************/
+
+// Lots of errors in a randomish way when this module loaded before
+//   that one.  Do we need to do this here, or in .install ?
+// @ToDo D7: still need this? @ToDo, remove these and retest
+module_load_include('inc', 'node', 'node.pages');
+module_load_include('inc', 'verdant_share', 'verdant_share_flags'); 
+
+
+
+/** Create a block for the rideshare post **/
+
+/**
+ * function verdant_share_block_info
+ *  hook_block implementation to create the rideshare post entry form  
+ *  (Do we want to set the region?)
+ */
+function verdant_share_block_info() {
+  $blocks['rideshares'] = array(
+    'info' => t('Ride Share Profile Block'),
+    //'status' => 1, // Most modules do not provide an initial value
+    'cache' => DRUPAL_NO_CACHE, // !!!???
+    'visibility' => BLOCK_VISIBILITY_LISTED,
+    'pages' => "share/ride/*
+      share/ride",
+  );
+  return $blocks; 
+}
+
+function verdant_share_block_view($delta = '') {
+  switch ($delta) {
+    case 'rideshares': 
+      if (user_access('post rideshare')) {
+
+        $type = 'share_ride';
+        global $user;
+        $account = $user;
+        $blocks['subject'] = t('My RideShare');
+        global $user;
+        $form_id = 'share_ride_node_form'; // item_node_form
+        $share_node;
+
+  //@ToDo rewrite this copied code
+
+        // Get $nid of user's share_ride, if they entered one
+        $query = new EntityFieldQuery;
+        $result = $query
+          ->entityCondition('entity_type', 'node')
+          ->propertyCondition('type', $type)
+          ->propertyCondition('uid', $user->uid)
+          ->execute();
+
+        if (!empty($result['node'])) {
+          //--> Yes, they already have a post 
+          // @ToDo change this function to one that assumes there
+          //  is only one matching node.  Or, deal with multiple results
+          //  if we decide on multiple posts per person.
+          $nodes = node_load_multiple(array_keys($result['node']));
+          //print_r($nodes[1]);  a
+          //returns: An array of node objects indexed by nid.
+        }
+        
+        if ( isset($nodes) && $share_node = array_shift($nodes) ) {
+        }
+        else {   // Create new share post
+          $share_node = (object) array(
+            // This would be a good place to create the title, then just hide it.  
+            // Get this error: Undefined property: stdClass::$name in verdant_share_block_view()
+            // for name line, when loading chart with no post created yet.
+            //  ... oh, that's for anon user. @ToDo simplify this section
+            //  for anon users
+            //
+            // Are we creating a post when they load the rideshare page
+            //  before they hit submit?  @ToDo/explore
+            'uid' => $user->uid, 
+            'name' => $user->name,
+            'type' => 'share_ride',
+            'language' => LANGUAGE_NONE   // or und
+          );
+        }
+
+        $printable_form = drupal_get_form($form_id, $share_node);
+        $blocks['content'] =  'Your post will act as your search parameters:' .
+          '<div id="verdant_rideshare">' . 
+          drupal_render($printable_form) .
+          '</div>';
+      } 
+      elseif (isset($user)) {
+        $blocks['content'] = t("You do not have permission to post a rideshare");
+      } 
+      else {
+        // The user isn't logged in.  This is just a message and an extra
+        //  login block.
+        // It's ok to remove the drupal_render form or otherwise change text here  
+        $blocks['title'] = "Your Rideshare Post";
+        $blocks['content'] =
+          t("Please sign in to create a rideshare post.
+          Your post will make it easier to search other people's posts:") .
+          '<br/><br/>' .
+          drupal_render(drupal_get_form('user_login_block')); 
+      }
+
+      return $blocks;
+        
+
+    }
+}
+
+
+
+
+/**
+ *  function verdant_share_menu
+ *   The main pages have their urls create in the view -- easy for users 
+ *    to change
+ *   Right now just the admin's settings configuration menu is set here. 
+ */
+
+
+function verdant_share_menu() {
+  $items = array();
+
+  // ref: http://drupal.org/node/206761
+  // structure? config? what should the parent be?
+  // I think overall this is ok: if they can administer site config, it flies.
+  $items['admin/structure/rideshare'] = array(
+    'title' => 'Event Sharing: Ride-share',
+    'description' => 'Settings for the event rideshare module',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('verdant_share_admin'), 
+    'access arguments' => array('administer site configuration'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+
+  /* LETTING_THE_VIEW_CREATE_THE_MENUS_verdant_share_menu_NOT_USED 
+    The plan could change!  Or just erase this soon.
+
+  //Carpool map page  
+  $items['share/ride/map'] = array(
+    'title' => 'Rideshare Map',
+    'description' => 'Post, or search the map for a rideshare',
+    'page callback' => 'verdant_share_map_page',
+    'access arguments' => array('access content'), //!!! reimplement? 
+    'type' => MENU_NORMAL_ITEM
+  );
+
+  $items['share/ride/chart'] = array(
+    'title' => 'Rideshare Chart',
+    'description' => 'Post, or use the chart to sort possible rides',
+    'page callback' => 'verdant_share_chart_page',  // CHANGE !!!!! :s /map/chart
+    'access arguments' => array('access content'), //!!! reimplement? 
+    'type' => MENU_NORMAL_ITEM
+  ); 
+  */
+
+  return $items;
+}
+
+/******* Views: api, load it, and internal functions to fill exposed forms *******/
+
+/**
+ * Implementation of hook_views_api
+ */
+// This hook simply tells views that this module supports Views API 2
+function verdant_share_views_api() {
+    return array(
+      'api' => 2,
+      //'path' => drupal_get_path('module', 'verdant_share') . '/.'; 
+          // Don't need if the *inc files are in this directory, they are.
+    );
+}
+
+/**
+ * function verdant_content_profile_load
+ * based loosely on [replaces the D6 approach] content_profile's function
+ */
+function verdant_content_profile_load($type = 'share_ride') {
+  global $user;
+
+  // In theory, they might not have access to their own rideshare post:
+  //  this would be an odd situation, more likely to be an error in 
+  //  configuring settings than a real desired behavior.
+  if ( user_access("edit share_ride content") ) {
+    return NULL;
+  }
+
+  // Get $nid of user's share_ride, if they entered one
+  $query = new EntityFieldQuery;
+  $result = $query
+    ->entityCondition('entity_type', 'node')
+    ->propertyCondition('type', $type)
+    ->propertyCondition('uid', $user->uid)
+    ->execute();
+
+  if (!empty($result['node'])) {
+    //--> Yes, they already have a post 
+    // @ToDo change this function to one that assumes there
+    //  is only one matching node.  Or, deal with multiple results
+    //  if we decide on multiple posts per person.
+    $nodes = node_load_multiple(array_keys($result['node']));
+    return array_shift($nodes);
+  }
+  return NULL;
+}  
+
+
+/**
+ *  verdant_share_date_filter is called from the view, and returns
+ *  text for a line of links that simulate filling in the exposed options.
+ *
+ *  - Note that the exposed options are there, hidden via css, and exposing
+ *  them lets you see what is happening.  It should be fine to expose them
+ *  if you think that would be a "feature."
+ *  - The Date module seems broken for exposed filters.  Search for the word
+ *  'horrible' in the text below.  Others seem to be playing with the problems
+ *  of exposed filters for date, and I didn't dig deeply, just trying to get
+ *  everything in place here for now.
+ *  - Timezones hacked, there must be a better way, search for $tz_offset !!!
+ *  - Need to code in if the user hasn't entered a date !!!
+ *  - Eventually, would like to give the admin more control, or the user,
+ *  for example changing the acceptable time window. See MOVE_TO_SETTINGS
+ *  - Might also add power-user options, though version has absorbed most of
+ *  what I intended to do in power-options
+ */
+function verdant_share_date_filter() {
+  /* Get the user's content_profile for share_ride */
+  $type = 'share_ride';
+  $ride_share = verdant_content_profile_load($type);
+
+  if ($ride_share) {   //--> yes, there is a user with a post  
+    // MOVE_TO_SETTINGS
+    $timediameter = 4;  /* diameter of window -- hours, intended for text.  Not used yet, is it? */
+    $time = 30 * $timediameter; // 1 hour diameter = 30 minute radius
+      /* "radius" in minutes -- they must be leaving within $time minutes of me */
+
+
+    $date_format_string = "Y-m-d\TH:i:s";  //!!!! not sure what \T is
+
+    //--- ARRIVAL window ---//
+    $arrival = $ride_share->field_arrival_time['und'][0]['value'];
+
+    /* warning/help/TO-DO for future:
+     *  Dates are doing very weird things *
+     *  the field_arrival_time doesn't seem to match the date I just entered,
+     *  and then format_date throws it off again, in the same direction (later)
+     *  Found help here, but it looks like a kludge: 
+     *    http://drupal.org/node/355394
+     */
+    $tz_offset = strtotime(date("M d Y H:i")) - strtotime(gmdate("M d Y H:i"));
+    $arrival_stamp = strtotime( $arrival ) + $tz_offset; 
+
+
+    // arrive after beginning of window
+    $arrival_stamp_early = $arrival_stamp - $time * 60; 
+    $arrival_early = date($date_format_string, $arrival_stamp_early);
+    $arrival_min_date = date('Y-m-d', $arrival_stamp_early);
+    $arrival_min_time = date('H\%3\Ai', $arrival_stamp_early);  // note: put html tranform into date function 16:43 is 16%3A43
+
+    // arrive before late end of window -- DATES IS BROKEN!!!
+    // I want to get the rest of the module working, see if dates
+    // gets fixed.  I get the sense people are working on this, and
+    // have no idea what's wrong... but it seems to require a date to be
+    // a day later, rather than an hour later, to be "after"
+    $arrival_stamp_late = $arrival_stamp + $time * 60;
+    $arrival_late = date($date_format_string, $arrival_stamp_late);
+    $arrival_max_date = date('Y-m-d', $arrival_stamp_late + 24 *3600); // horrible!!!
+    $arrival_max_time = date('H\%3\Ai', $arrival_stamp_late);  // note: put html tranform into date function 16:43 is 16%3A43 ... probably didn't have to do that,nothing seemed to break.
+
+    // and the fragment of the URL:
+    $arrive_fragment = "date_filter_arrive[min][date]=$arrival_min_date&date_filter_arrive[min][time]=$arrival_min_time&date_filter_arrive[max][date]=$arrival_max_date&date_filter_arrive[max][time]=$arrival_max_time";
+
+
+    
+    //---  DEPARTURE window ---//
+    $departure = $ride_share->field_departure_time['und'][0]['value'];
+    $departure_stamp = strtotime( $departure)  + $tz_offset;
+
+    // depart after beginning of window
+    $departure_stamp_early = $departure_stamp - $time * 60; // seems to work ok
+    $departure_early = date($date_format_string, $departure_stamp_early);
+    $departure_min_date = date('Y-m-d', $departure_stamp_early);
+    $departure_min_time = date('H\%3\Ai', $departure_stamp_early);  // :-) note: put html tranform into date function 16:43 is 16%3A43
+
+    // depart before late end of window
+    $departure_stamp_late = $departure_stamp + $time * 60 + /* horrible!!! */ + 3600 * 24;
+    $departure_late = date($date_format_string, $departure_stamp_late);
+    $departure_max_date = date('Y-m-d', $departure_stamp_late);
+    $departure_max_time = date('H\%3\Ai', $departure_stamp_late);  // :-) note: put html tranform into date function 16:43 is 16%3A43
+
+    // and the fragment of the URL:
+    $depart_fragment = "date_filter_depart[min][date]=$departure_min_date&date_filter_depart[min][time]=$departure_min_time&date_filter_depart[max][date]=$departure_max_date&date_filter_depart[max][time]=$departure_max_time";
+
+    //--- Some basic choice fragments: ---//
+    $middlefavorites = "flagged_favorites=All&unflagged_remove=0";
+    $favorites = "flagged_favorites=1&unflagged_remove=0";
+    $check_removed = "flagged_favorites=All&unflagged_remove=1";
+
+    //--- Get base url for chart or view, eg share/ride/map
+    $base = limited_url();
+    
+    //--- Create the links to pass to the view --//
+    /* (note: also considered just passing the fragments, so could
+      be edited in the view, that is an easy switch to make */
+    // @ToDo: if don't majorly revise, then use l function here instead
+    $l_all = "<a href=\"/$base?$middlefavorites\" title=\"All shares except those you have removed\" >Show All</a>";
+    $l_arrive = "<a href=\"/$base?$middlefavorites&$arrive_fragment\" title=\"See people arriving nearly the same time as you\" >By Arrival -- $timediameter hour window</a>";
+    $l_depart = "<a href=\"/$base?$middlefavorites&$depart_fragment\" title=\"See people departing nearly the same time as you\" >By Departure  -- $timediameter hour window</a>";
+    $l_match = "<a href=\"/$base?$middlefavorites&$depart_fragment&$arrive_fragment\" title=\"See people traveling at about the same times as you, both arrival and departure\" >Both Times</a>";
+    $l_favs = "<a href=\"/$base?$favorites\" title=\"Only see people clicked as favorites\" >Favorites Only</a>";
+    $l_removed = "<a href=\"/$base?$check_removed\" style=\"font-size: .9em;\" title=\"Reconsider posts you've previously removed\" >Reconsider Removed</a>";
+    
+    $id = "views-exposed-form-verdant-module-generated-rideshare-page-2"; // !!!
+
+    $quicklinks = "$l_all | $l_arrive | $l_depart | $l_match | $l_favs | $l_removed";
+
+    return array($quicklinks);
+  } 
+  else {  //---> No post!
+    global $user;
+    if ($user->uid > 0) {
+      if ( user_access("create share_ride content") ) {
+        return array(t("Create a post to see sorting options"));
+      }
+      else {
+        return array(t("Sorry, you do not have permission to create a rideshare post."));
+      }
+    } 
+    else {
+      return array(t("Log in first, then create a post to see sorting options"));
+    }
+  }
+}
+ 
+ 
+  // Let users play with this (is that a good idea?)
+  // $views[$view->name] = $view;
+
+
+
+// Alter the form to point back at same page.
+function verdant_share_form_alter(&$form, $form_state, $form_id) {
+
+  if ( $form_id == 'share_ride_node_form') {
+    // add some css ... might need this more often?
+    drupal_add_css(drupal_get_path('module', 'verdant_share') . 
+      '/css/verdant_share_extra_style.css');
+
+
+    // Beginning effort with dates.  Need to set these values in config
+    if ( $form['field_arrival_time']['und'][0]['#date_is_default'] ) {
+      $form['field_arrival_time']['und'][0]['#default_value']['value'] = 
+        //could make the default 'now', or now plus three months...;
+        variable_get('verdant_arrive_time', '2012-03-19 00:00:00');
+    }
+    if ( $form['field_departure_time']['und'][0]['#date_is_default'] ) {
+      $form['field_departure_time']['und'][0]['#default_value']['value'] = 
+        variable_get('verdant_departure_time', '2012-03-23 20:00:00');
+    }
+    
+    // Redirects not working in D6 style, try again:
+    $form['actions']['submit']['#submit'][] = 'share_ride_submit';
+
+    $form['field_description']['#after_build'][] = 'verdant_reformat_textbox';
+    $form['comment_settings']['#access'] = FALSE;
+    $form['menu']['#access'] = FALSE;
+    $form['path']['#access'] = FALSE;
+    $form['author']['#access'] = FALSE;
+    $form['options']['#access'] = FALSE;
+    $form['revision_information']['#access'] = FALSE;
+
+    // !!! can this go to inc file?
+    $form['locations'][0]['#collapsed'] = 0;
+
+    global $user;
+    $title = 'Rideshare for ' . $user->name;
+    $form['title']['#default_value'] = 'Rideshare post for ' . $user->name;
+    $form['title']['#access'] = FALSE;  
+
+    // Clean up weirdness of Location, caused by VerticalTabs
+    /*** Removing vertical tabs is kinda hard. ***/
+    // tutorial http://drupal.org/node/1048644
+    unset($form['locations']['#group']);  
+    $form['locations']['#weight'] = 7; // needed after removing Vertical Tabs.
+
+    // display in the unnecessary box that contains all[=1] location
+    $form['locations']['#type'] = 'no_formatting_here_please';
+    // display in the one locations allowed:
+    $form['locations'][0]['#description'] = t("Shortcut: click the map 
+      <em>near</em> your pickup.  Or enter
+      an address close enough to your house for planning but fuzzy enough for 
+      privacy");
+  }
+}
+
+/* 
+ * Remove the format guidelines
+ *  Advice is here, especially if I went too far:
+ *  http://timonweb.com/how-remove-format-options-guideliness-comments-textarea-drupal-7
+ */
+function verdant_reformat_textbox(&$form) {
+  // Hide guideliness
+  unset( $form[LANGUAGE_NONE][0]['format'] );
+  //$form[LANGUAGE_NONE][0]['format']['guidelines']['#access'] = FALSE; // Note ‘und’, you may need to set your comment form language code instead
+  // Hide Filter Tips
+  //$form[LANGUAGE_NONE][0]['format']['help']['#access'] = FALSE;
+  // the above two partly work... this might finish....
+  // $form[LANGUAGE_NONE][0]['format']['#attributes'] = array('style' => 'display: none;');
+  return $form;
+}
+
+
+/* function share_ride_submit 
+ *  merely redirects back to same page
+ *  See: http://drupal.org/node/1074616#comment-4183638
+ */
+function share_ride_submit($form, &$form_state) {
+  $form_state['redirect'] = limited_url();
+}
+
+/* function limited_current_url    
+ *  return current url from among limited set 
+ */
+function limited_url() {
+  if ( $_GET['q'] == 'share/ride/map' ) {
+    return 'share/ride/map';
+  } 
+  else {
+    return 'share/ride/chart';
+  }
+}
+
+
+
+ /**
+  * verdant_share_admin collects the module settings  
+  *  use variable_get(... to get the variables set here
+  */
+
+    // Take a look at this:
+    // http://drupal.org/files/issues/location.module_33.patch
+    // look at the location settings page, then see code used here:
+    // http://vfit.net/sites/all/modules/location/location.admin.inc
+
+function verdant_share_admin() {
+  $form = array();
+
+    $form['verdant_block_text'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Ride Post Location'),
+    '#default_value' => 
+      variable_get('verdant_block_text', 'in the right sidebar'),
+    //'#maxlength' => 2,
+    '#description' => t("Adjust the help instructions for users:
+    Where can users see the form to create their
+    rideshare post, if they haven't entered one already?  
+    The text you enter here will finish the sentence
+    beginning 'Create a rideshare post ...' for example
+    'in the left sidebar' or 'above these instructions'"),
+    '#required' => TRUE,
+  );
+
+  // Set the arrival and departure default times
+  // see: http://drupal.org/node/292667
+  $form['verdant_arrive_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Conference default arrival/opening day'),
+    '#required' => FALSE, // but default given anyway
+    '#date_year_range' => '-3:+6',
+    '#default_value' =>  variable_get('verdant_arrive_time', 
+      '2012-3-19 8:00:00'),
+  );
+  $form['verdant_departure_time'] = array(
+    '#type' => 'date_select',
+    '#title' => t('Conference default departure/closing day'),
+    '#required' => FALSE, // but default given anyway
+    '#date_year_range' => '-3:+6',
+    '#default_value' =>  variable_get('verdant_departure_time',
+      '2012-3-22 21:00:00'), 
+  );
+
+  /* Begining of thinking about putting location in config
+    Does any other module do this?  Create an issue if you see/know
+    the best way to do this (both tech and what the desired approach
+    should be 
+  $form['verdant_event_location'] = array(
+    '#type' => 'location_element',
+    '#has_garbage_value' => TRUE,
+    '#value' => '',
+    '#title' => t('Conference Location'),
+    '#description' => "Clicking the map is the easy way.  This doesn't yet do anything anyway, please center the map and zoom it on the gmap configuration page instead.",
+    '#required' => FALSE, // but default given anyway
+  );
+  */
+
+return system_settings_form($form);
+}
+
+
+//--> Avoid php in the header.  This requires the view be modified
+//     after it is stored in the database, so each time it is rendered.
+function verdant_share_views_pre_view(&$view, &$display_id, &$args) {
+  if ( $view->name == 'verdant_module_rideshare' ) {
+    
+    $content = $view->display_handler->display->display_options['header']['text']['content']; 
+
+
+    // this is NULL by default
+    // I believe that by setting it true, it means the default header will
+    // be the one that gets used
+    // krumo($view->display_handler->options['defaults']['header']['content']);
+    // otherwise, 
+    //  it's $view->display_handler->options['header']['text']['content']
+    // other-approach=uncomment:
+    //$view->display_handler->options['defaults']['header']['content'] = true;
+
+/*
+    print "<pre>";
+print_r($view);
+die();
+     */
+
+    // Make the changes
+    $where = variable_get('verdant_block_text', 'in the left sidebar');
+    //$where = check_markup($where);
+    $where = check_plain($where);
+    $content = preg_replace('/\[in_the_sidebar\]/', $where, $content);
+
+    $dir =  drupal_get_path('module', 'gmap'); // eg. sites/all/modules/gmap
+    $dir .= '/markers/small';
+    // use theme_image
+    $m_ride = theme('image', array(
+            'path' => "$dir/bred.png",
+                  'alt' => "image for rider map pin",
+                      ));
+    $m_both = theme('image', array(
+            'path' => "$dir/orange.png",
+                  'alt' => "image for rider map pin",
+                      ));
+    $m_seat = theme('image', array(
+            'path' => "$dir/yellow.png",
+                  'alt' => "image for rider map pin",
+                      ));
+    $m_bus = theme('image', array(
+            'path' => "$dir/green.png",
+                  'alt' => "image for rider map pin",
+                      ));
+    $markers = "$m_ride Rider&nbsp;&nbsp;&nbsp;$m_both Either Ride or Drive&nbsp;&nbsp;&nbsp;${m_seat}Driver&nbsp;&nbsp;&nbsp;${m_bus}Bus/Bike/Walk group";
+
+    //plain links: $markers = "<img src=\"$dir/bred.png\">Rider&nbsp;&nbsp;&nbsp;<img src=\"$dir/orange.png\">Either Ride or Drive&nbsp;&nbsp;&nbsp;<img src=\"$dir/yellow.png\">Driver&nbsp;&nbsp;&nbsp;<img src=\"$dir/green.png\">Bus/Bike/Walk group";
+    $content = preg_replace('/\[map_markers\]/', $markers, $content);
+
+    $filter_links = verdant_share_date_filter();
+    $content = preg_replace('/\[filter_links\]/', $filter_links[0], $content);
+    // other-approach=switch
+    $view->display_handler->options['header']['text']['content'] = $content;
+    //$view->display_handler->default_display->options['header']['text']['content'] = $content;
+  }
+}
+
+/* function verdant_share_preprocess_node(&$vars)
+ * Transform the "title" of the post
+ *  into a contact link
+ *  (the title is auto-generated "Rideshare post for ...")
+ */
+
+/* Brainstorm:   make this a contact form overtop the map?
+ * http://drupal.org/node/335020 
+ */
+function verdant_share_preprocess_node(&$vars) {
+  if ( $vars['type'] == 'share_ride' ) {
+    $uid = $vars['uid'];
+    $recip = user_load($uid);
+
+    // Is there a contact for this user?
+    if ( $recip->data['contact']) {
+      // Add the link to content..
+      $vars['content']['auto_contact'] = array( 0 => array('#markup' =>
+        l("Contact " . $recip->name, "user/$uid/contact", 
+          array('attributes' => array('class' => 'rideshare-contact-link'))
+        )
+      ));
+    } 
+    else {
+      $vars['content']['auto_contact'] = array( 0 => array('#markup' =>
+        "<div class='rideshare-contact-link'>This user disabled 
+          automatic contacts.
+        </div>"));
+    }
+  }
+}

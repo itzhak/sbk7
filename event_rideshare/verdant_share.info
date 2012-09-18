@@ -1,0 +1,26 @@
+name = Verdant Rideshare for Events
+description = Intended for a conference's website, to coordinate ridesharing among attendees going to the same location. (One of 3: flight, carpool, and roomshare)
+core = 7.x
+version = "7.x-0.01"
+configure = admin/config/content/verdant/rides
+package = Verdant Share
+
+
+dependencies[] = features
+dependencies[] = views
+dependencies[] = views_ui
+dependencies[] = text
+dependencies[] = date
+dependencies[] = date_popup
+dependencies[] = date_views
+     // implements "between" in views
+dependencies[] = location
+dependencies[] = flag
+dependencies[] = gmap
+dependencies[] = gmap_taxonomy
+dependencies[] = gmap_location
+dependencies[] = location_node
+dependencies[] = contact
+
+//dependencies[] = php
+

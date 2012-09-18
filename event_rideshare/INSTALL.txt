@@ -1,0 +1,154 @@
+Please follow these instructions, just enabling the module
+will not work smoothly.
+
+I. BASIC INSTALLATION
+II. OPTIONS and INFORMATION ON CODER APPROACH
+
+I. BASIC INSTALLATION
+
+[0] Enable the verdant_share module
+A) Get the dependent modules, optionally with drush shortcut:
+drush dl features views date date_views flag gmap ctools location
+
+==> You may get a notice about gmap markers, you can safely ignore this:
+"Trying to get property of non-object in gmap_regenerate_markers"
+see http://drupal.org/node/1414196
+
+[1] Maps and Locations
+
+  A. Gmaps.    admin/config/services/gmap
+    - get a Google Maps API Key
+    - You'll probably want to center the map on your event, 
+      and zoom in based on how far average people are driving. 
+    - Note: people are working on updating gmap module to Google maps API v3.
+      Hopefully you can figure out how to get gmaps working on your site.
+      It should also be possible to use other mapping tools that integrate
+      with views by editing the view that comes with this module, 
+      or just use a chart without a map. http://drupal.org/node/1459606 
+      If you use OpenLayers please let us know how it goes or ask for help!
+
+  B. Location.   admin/config/content/location 
+    - Required (more or less): Use a Google Map to set latitude and longitude  
+
+  C. GMap markers:   -- alpha: all these steps automated --
+
+	@todo: Ideally, someone will create new images.
+
+
+[3] Blocks: The view will create a chart and map for people to share rides.
+  Posts are created on those pages using a block. admin/structure/block
+  Go to the blocks page and move "Ride Share Profile Block" 
+    to an appropriate region(eg, Left Sidebar, moved to the top of the region).
+  ( Option: I tend to ignore the Exposed Form blocks, 
+	  but they may be interesting to
+    play with, especially if you'd like to make major changes.)
+
+[4] Review permissions, for whatever role you want using the carpool system:
+	admin/people/permissions
+  A. Submit latitude/longitude
+     ** @Feedback: we're making you do this by hand because it seems invasive
+     to change it for you, which could be done in the feature export.
+  B. Share Ride:  Create, Edit and Delete your own content
+		 ** @Feedback: should we automate this for Authenticated users?
+			Or might someone use a different Role for people creating rideshares?
+
+[5] Account Settings: admin/config/people/accounts (Drupal's defaults work here,
+			if you haven't changed them, skip all this.)
+  A. Contact: recommended to set cont'act form default to enabled by default
+     think about users who may have
+     signed up already (including your admin account) if you had a different
+     default
+	
+			-- this is Drupal's out-of-the-box config
+     @ToDo: how do we deal with users who don't want to be contacted?
+  B. Recommended, enable user pictures
+
+
+[6] Check the share_ride content type via /admin/structure/types
+to set the Locative information as you like.  Minimum number of locations
+could be set to 1 or 0, and choose what to collect.
+
+[7] Rideshare Chart and Rideshare Map are in your Navigation Menu, move as 
+  desired
+
+
+
+OPTIONS and INFORMATION ON CODER APPROACH
+
+Verdant_Share uses a lot of standard components (cck, flags, views) that you're
+welcome to mess with -- please post your story of how you use this module:
+
+* You can replace the text "Please sign in to create a rideshare post"
+  with a login block.  
+  Notes are already in the code! (grep the quote)
+  @ToDo -- we could make this configurable.
+
+* Giving node's locations, and setting them as cck fields, are options
+that are supposed to conflict.  In May, 2011, I'm setting locations for the
+whole node... if you've enabled the cck-location module [     ] 
+you'll have to hope someone has fixed the conflict, or change the way
+the view and cck work here.  This note is from D6... but if you explore
+Location as a CCK field please report back!
+
+
+
+* Something uses "A PHP code input format has been created."  This
+didn't create any prolems with my setup, let me know if it does for you!
+
+
+Other Options: you can edit the Content Type to collect different details
+on the address or change the default country.  Locative information at /admin/structure/types/manage/share-ride
+
+Exposed Filters
+The view that comes with this module uses pre-digested one-click views, like
+"show me everyone arriving within two hour of my arrival."  The exposed filters
+are put in a block that we normally wouldn't display to users, but of course
+you can, or use it to re-write our suggested exposed-filter-links.
+
+Menus: The chart and map are placed in your menu by the view.  We could
+explore making the URLs configurable
+
+
+
+
+[7] Content Type: Locations aren't being exported/imported correctly,
+so set the minimum number of locations to 1.  ( @todo: can I import this info, hand
+coding, even if the export skips it?) 
+
+Being fixed... Automatic title wasn't part of the cck export 
+(haven't even looked at this issue yet).  ** may have fixed this. the fix
+seems clunkier than this recommendation **  ** BEING FIXED **
+Go to the share-ride content type, and
+enable "Automatic title generation."  Set it to 
+"Automatically generate the title
+and hide the title field," using this pattern (or whatever you like):
+[author-name]'s rideshare
+
+
+[10] Optional, put the conference on the map.  Haven't thought about this yet...
+
+* Content Taxonomy didn't quite come through.  Why?  Is it about the order 
+things are enabled?  Trying new things with each round.  It works if I put the
+code in the enable section instead of install.
+
+
+
+// added by isay
+    Rideshare feature enabled. See INSTALL.txt
+    - Get a Google Maps API Key, then reload and center/zoom map on your event. Recommend setting 'Marker Action' to 'Open info window'
+    - Click on 'Use a Google Map to set latitude and longitude'
+    - and set up geocoding for countries people might be driving from
+    - Go to the blocks page and move "Ride Share Profile Block" to an appropriate region
+    - Review permissions, for whatever role you want using the carpool system: 'Submit latitude/longitude' and 'Share Ride' Create, Edit and Delete your own content
+    - We recommend against changing the Account Setting defaults: [Re-enable the personal contact form and User Pictures.]
+    - Adjust the share_ride content type Locative Information to your preferences (show the city, state, fine-tuned values optional). WARNING: seem to need to open and save this, even without making changes, to get the content-type created by the feature module to work.
+    - Edit the view for the map a bit: Can you get Gmap markers by taxonomy working? See http://drupal.org/node/1446178 for the challenge. If yes, click Gmap 'Settings' and set Marker Handling to 'By term'; If no (turn it back off...) edit the Header and delete the div for 'rideshare_map_key' with that shows the map_markers.
+    - And some simple config for the rideshare module itself
+    You should be up and running, with menu items in your Navigation menu for a chart and map. Expect to see a form for your rideshare and an empty view. We recommend creating the first post (at least a test post) right away so other users don't see the 'no content' message. (note that the admin account 'Personal contact form' defaults to off, even if the default for other users is on.)
+    If the contact link doesn't show up on the chart view, please see the INSTALL.txt file to patch views.
+    With luck and backups, you can change the views and Rideshare Content Type to fit your event's needs without breaking anything.
+    The configuration options have been saved.
+
+	
+	TODO /#overlay=admin/structure/views/view/verdant_module_rideshare/edit/page_2
+	- Edit the view for the map a bit: Can you get Gmap markers by taxonomy working? See http://drupal.org/node/1446178 for the challenge. If yes, click Gmap 'Settings' and set Marker Handling to 'By term'; If no (turn it back off...) edit the Header and delete the div for 'rideshare_map_key' with that shows the map_markers.

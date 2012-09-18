@@ -1,0 +1,204 @@
+<?php
+
+/**
+ * @file
+ * Install and Uninstall the event_rideshare module
+ *
+ * @ToDo: Permissions on Post Rideshare need review (possibly removal)
+ */
+
+/**
+ * Implementation of hook_install().
+ *
+ *
+ * Permissions?  See _travelanion_permission_add
+ */
+function verdant_share_install() {
+
+  //Enable the default verdant_share_7 feature
+  $module_list = array('verdant_share_7');
+  module_enable($module_list);
+
+  //## Fill in the taxonomy terms and gmap_taxonomy_term
+  //    See steindom.com/articles/creating-vocabularies-and-taxonomy-terms-programmatically-drupal-7
+
+  // Get the vid.  Create the vocab here instead of feature to be keep simple
+  taxonomy_vocabulary_save((object) array(
+      'name' => 'Means of Transit',
+      'machine_name' => 'means_of_transit',
+      'description' => 'Offering a ride, needing one, taking the bus, etc.',
+        // description is very unnecessary, but why isn't it working?
+      'module' => 'verdant_share'
+    ));
+  $vid = db_query("SELECT vid FROM {taxonomy_vocabulary} 
+    WHERE machine_name = 'means_of_transit'")->fetchField();
+
+  // This needs work to remove the Notice shown below.. but works
+  // Set the gmap marker, 
+  //  see: function gmap_taxonomy_taxonomy_vocabulary_update
+  $status = variable_get('gmap_taxonomy_vocabs', array()); 
+  $status[$vid] = TRUE;//   --- this line worked, but I suspect created
+  // Notice: Trying to get property of non-object in gmap_regenerate_markers()
+  //   (line 555 of ....
+  //   This is not important, and there is a patch other people are working on
+  //   so ignore it.
+  variable_set('gmap_taxonomy_vocabs', $status);
+
+  if (!$vid) {
+    //why didn't this work:
+    //drupal_set_message(st('Could not create vocabulary in verdant_share.install.  Very bad.  <a href="http://drupal.org/node/add/project-issue/1161014">Create an issue</a> and let them know.  Event Rideshare install process aborted.)', 'error');
+
+    drupal_set_message(st('Could not create vocabulary in verdant_share.install.  Very bad.  Event Rideshare install process aborted.') .
+      l(st("Create an issue to let module devs know what happened"),
+        "http://drupal.org/node/add/project-issue/1161014"), 'error');
+    return;
+  }
+
+
+  //## Save taxonomy terms and the default map marker
+
+  //Set up gmap_marker and term data (temporary)
+  $terms = array(
+    (object) array(
+      'name' => 'I could drive or ride',
+      'description' => '',
+      'map' => 'small orange',
+      'vid' => $vid,
+    ),
+    (object) array(
+      'name' => 'I need a ride',
+      'vid' => $vid,
+      'description' => '',
+      'map' => 'small red'
+    ),
+    (object) array(
+      'name' => 'Offering a seat',
+      'vid' => $vid,
+      'description' => '',
+      'map' => 'small yellow'
+    ),
+    (object) array(
+      'name' => 'Take the bus, bicycle or walk as a group',
+      'vid' => $vid,
+      'description' => 'Get together and form a transit, bicycle, walking group',
+      'map' => 'small green'
+    ),
+  );
+
+  // put terms and map-markers into database  
+  foreach ( $terms as $term ) {
+    taxonomy_term_save($term);
+    // and the map using taxonomy markers
+    $table = 'gmap_taxonomy_term';
+    $record = array(
+      'tid' => $term->tid,
+      'marker' => $term->map
+    );
+    drupal_write_record($table, $record);
+  }
+
+  drupal_set_message(st("Rideshare feature enabled. See INSTALL.txt <br/>") .
+    l(st("- Get a Google Maps API Key, then reload and center/zoom map on your event. Recommend setting 'Marker Action' to 'Open info window'"),
+      "admin/config/services/gmap") . '<br/>' .
+    l(st("- Click on 'Use a Google Map to set latitude and longitude'"),
+      "admin/config/content/location") . '<br/>' .
+    l(st("- and set up geocoding for countries people might be driving from"),  
+      "admin/config/content/location/geocoding") . '<br/>' .
+    l(st('- Go to the blocks page and move "Ride Share Profile Block"
+          to an appropriate region'),
+      "admin/structure/block") . '<br/>' .
+    l(st("- Review permissions, for whatever role you want using the 
+      carpool system: 'Submit latitude/longitude' and 'Share Ride' 
+      Create, Edit and Delete your own content"),
+      "admin/people/permissions") . '<br/>' .
+      l(st("- We recommend against changing the Account Setting defaults: 
+      [Re-enable the personal contact form
+      and User Pictures.]"),
+    "admin/config/people/accounts") . '<br/>' .
+    l(st("- Adjust the share_ride content type Locative Information to
+    your preferences (show the city, state, fine-tuned values optional).  WARNING: seem to need to open and save this, even without making changes, to get the content-type created by the feature module to work."), 
+    "admin/structure/types/manage/share-ride") . '<br/>' .
+    l(st("- Edit the view for the map a bit: Can you get Gmap markers by taxonomy working?  See http://drupal.org/node/1446178 for the challenge.  If yes, click Gmap 'Settings' and set Marker Handling to 'By term'; If no (turn it back off...) edit the Header and delete the div for 'rideshare_map_key' with that shows the map_markers."),
+      'admin/structure/views/view/verdant_module_rideshare/edit/page_2') . '<br/>' .
+          l(st("- And some simple config for the rideshare module itself"),
+      'admin/structure/rideshare') . '<br/>' .
+      
+        "You should be up and running, with menu items in your Navigation menu 
+    for a chart and map.  Expect to see a form for your rideshare
+      and an empty view.  We recommend creating the first post 
+      (at least a test post) right away
+      so other users don't see the 'no content' message.  (note that the admin
+      account 'Personal contact form' defaults to off, even if the default for
+      other users is on.)
+      <br/>If the contact link doesn't show up on the chart view,
+      please see the INSTALL.txt file to patch views.
+      <br/>With luck and backups, you can change the
+      views and Rideshare Content Type 
+      to fit your event's needs without breaking anything.")
+    ;
+
+}
+
+/**
+ * Define the unique permissions belonging to the rideshare module.
+ *
+ * Implements hook_permission()
+ *
+ * @return <type>
+ */
+function verdant_share_permission() {
+  return array(
+    'post rideshare' => array(
+      'title' => t('Post a rideshare entry'),
+      'description' => t('Allows a user to post a rideshare entry.'),
+    ),
+  );
+}
+
+/**
+ * When the module is enabled, give authenticated users the ability to
+ * post rideshare entries by default.
+ *
+ * @ToDo Discuss whether this should be changed on enable/disable,
+ *  or turned on when *installed* and just left untouched unless
+ *  user changes it (so they can toggle the rideshare without changing
+ *  permission.)  Which is Drupal-style?  I see advice here
+ *  http://data.agaric.com/setting-permissions-your-module-when-it-enabled
+ *  that is a little confusing, seems like the example uses enable instead
+ *  of install because it has to because of timing issues that don't 
+ *  effect us.
+ *
+ * Implements hook_enable()
+ *
+ * This is in bootstrap: 
+ *  define('DRUPAL_AUTHENTICATED_RID', 2)
+ */
+function verdant_share_enable() {
+  $permissions = array('post rideshare' => TRUE);
+  user_role_change_permissions(DRUPAL_AUTHENTICATED_RID, $permissions);
+}
+
+/**
+ * When the module is diabled, revoke the privelege to create rideshare
+ * posts.
+ *
+ * Implements hook_disable()
+ */
+function verdant_share_disable() {
+  $permissions = array('post rideshare');
+  $roles = user_roles();
+  foreach ($roles as $rid => $name) {
+    user_role_revoke_permissions($rid, $permissions);
+  }
+}
+
+
+/**
+ * Remove the default verdant_share_7 feature
+ *
+ * Implementation of hook_uninstall().
+ */
+function verdant_share_uninstall() {
+  $module_list = array('verdant_share_7');
+  module_disable($module_list);
+}
