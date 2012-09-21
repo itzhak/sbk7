@@ -1,5 +1,5 @@
 <?php
-// $Id: $
+// $IdS$
 
 /********** Misc setup  ************************************************/
 
@@ -9,6 +9,10 @@
 module_load_include('inc', 'node', 'node.pages');
 module_load_include('inc', 'verdant_share', 'verdant_share_flags'); 
 
+/**
+ * @file
+ * TODO add description of module
+ */
 
 
 /** Create a block for the rideshare post **/
@@ -20,9 +24,9 @@ module_load_include('inc', 'verdant_share', 'verdant_share_flags');
  */
 function verdant_share_block_info() {
   $blocks['rideshares'] = array(
-    'info' => t('Ride Share Profile Block'),
+    'info' => t('RideShare Profile Block'),
     //'status' => 1, // Most modules do not provide an initial value
-    'cache' => DRUPAL_NO_CACHE, // !!!???
+    'cache' => DRUPAL_NO_CACHE, // TODO check if suitable
     'visibility' => BLOCK_VISIBILITY_LISTED,
     'pages' => "share/ride/*
       share/ride",
@@ -30,21 +34,22 @@ function verdant_share_block_info() {
   return $blocks; 
 }
 
-function verdant_share_block_view($delta = '') {
-  switch ($delta) {
+/**
+ * function verdant_share_block_view
+ * TODO add description
+ */
+function verdant_share_block_view($block_name = '') {
+  switch ($block_name) {
     case 'rideshares': 
       if (user_access('post rideshare')) {
-
+        global $user;
+		  
         $type = 'share_ride';
-        global $user;
         $account = $user;
-        $blocks['subject'] = t('My RideShare');
-        global $user;
         $form_id = 'share_ride_node_form'; // item_node_form
         $share_node;
 
-  //@ToDo rewrite this copied code
-
+        //TODO rewrite this copied code
         // Get $nid of user's share_ride, if they entered one
         $query = new EntityFieldQuery;
         $result = $query
@@ -63,9 +68,8 @@ function verdant_share_block_view($delta = '') {
           //returns: An array of node objects indexed by nid.
         }
         
-        if ( isset($nodes) && $share_node = array_shift($nodes) ) {
-        }
-        else {   // Create new share post
+        if (!isset($nodes)  || !($share_node = array_shift($nodes))) {
+           // Create new share post
           $share_node = (object) array(
             // This would be a good place to create the title, then just hide it.  
             // Get this error: Undefined property: stdClass::$name in verdant_share_block_view()
@@ -83,29 +87,32 @@ function verdant_share_block_view($delta = '') {
         }
 
         $printable_form = drupal_get_form($form_id, $share_node);
-        $blocks['content'] =  'Your post will act as your search parameters:' .
+        $content =  'Your post will act as your search parameters:' .
           '<div id="verdant_rideshare">' . 
-          drupal_render($printable_form) .
-          '</div>';
-      } 
-      elseif (isset($user)) {
-        $blocks['content'] = t("You do not have permission to post a rideshare");
-      } 
-      else {
+          drupal_render($printable_form) . '</div>';
+      } elseif (isset($user)) { // && !user_access('post rideshare'))
+        $content = t("You do not have permission to post a rideshare");
+      } else { // if user is not logged in
         // The user isn't logged in.  This is just a message and an extra
         //  login block.
         // It's ok to remove the drupal_render form or otherwise change text here  
-        $blocks['title'] = "Your Rideshare Post";
-        $blocks['content'] =
-          t("Please sign in to create a rideshare post.
-          Your post will make it easier to search other people's posts:") .
-          '<br/><br/>' .
-          drupal_render(drupal_get_form('user_login_block')); 
+        $title = 'Your Rideshare Post'; // TODO check why only here used title
+        $content = t("Please sign in to create a rideshare post.
+                     Your post will make it easier to search other people's posts:") .
+                   '<br/><br/>' . drupal_render(drupal_get_form('user_login_block')); 
       }
+	  
+	  $blocks = array(
+	    'subject' => t('My RideShare'),
+		'content' => $content,
+	  );
+	  
+	  if (isset($title)) {
+	  	$blocks['title'] = $title;
+	  }
+	  
 
       return $blocks;
-        
-
     }
 }
 
@@ -592,3 +599,13 @@ function verdant_share_preprocess_node(&$vars) {
     }
   }
 }
+
+/**
+ *  Implements hook_help
+ */
+ function verdant_share_help($path, $arg) {
+ 	if ($path == 'admin/help#verdant_share') {
+ 		// TODO add help text page 38
+ 		return t('explanation of rideshare module');
+ 	}
+ }
