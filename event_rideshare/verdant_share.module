@@ -39,8 +39,13 @@ function verdant_share_block_info() {
  * TODO add description
  */
 function verdant_share_block_view($block_name = '') {
+  $block = array(
+    'subject' => '',
+    'content' => '',
+  );
+  
   switch ($block_name) {
-    case 'rideshares': 
+    case 'rideshares':
       if (user_access('post rideshare')) {
         global $user;
 		  
@@ -87,18 +92,26 @@ function verdant_share_block_view($block_name = '') {
         }
 
         $printable_form = drupal_get_form($form_id, $share_node);
-        $subject = t('My Rideshare');
-        $content =  'Your post will act as your search parameters:' .
-          '<div id="verdant_rideshare">' . 
-          drupal_render($printable_form) . '</div>';
+        $block['subject'] = t('My Rideshare');
+        $block['content'] = array(
+          '#title' => t('Your post will act as your search parameters:'),
+          '#prefix' => '<div id="verdant_rideshare">',
+          '#suffix' => '</div>',
+          'share_ride_form' => $printable_form,
+        );
+        
       } elseif (isset($user)) { // && !user_access('post rideshare'))
-        $subject = t('Access denied');
-        $content = t('You do not have permission to post a rideshare');
+        $block['subject'] = t('Access denied');
+        $block['content'] = array(
+          '#title' => t('You do not have permission to post a rideshare'),
+        );
+        
       } else { // if user is not logged in
         // The user isn't logged in.  This is just a message and an extra
         //  login block.
         // It's ok to remove the drupal_render form or otherwise change text here  
-        $subject = 'Your Rideshare Post';
+        $block['subject'] = t('Your Rideshare Post');
+        //$block['content'] = array( // TODO continue here
         $content = t("Please sign in to create a rideshare post.
                      Your post will make it easier to search other people's posts:") .
                    '<br/><br/>' . drupal_render(drupal_get_form('user_login_block')); 
@@ -106,12 +119,13 @@ function verdant_share_block_view($block_name = '') {
 	  
 	  $blocks = array(
 	    'subject' => $subject,
-		'content' => $content,
+		  'content' => $content,
 	  );
 	  
       return $blocks;
     }
 }
+
 
 
 
