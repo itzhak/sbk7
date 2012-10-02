@@ -51,33 +51,18 @@ function verdant_share_block_view($block_name = '') {
 		  
         $type = 'share_ride';
         $form_id = 'share_ride_node_form'; // item_node_form
-        $share_node;
 
-        //TODO rewrite this copied code
-        // Get $nid of user's share_ride, if they entered one
-        $query = new EntityFieldQuery;
-        $result = $query
-          ->entityCondition('entity_type', 'node')
-          ->propertyCondition('type', $type)
-          ->propertyCondition('uid', $user->uid)
-          ->execute();
+        $query = db_select('node', 'n')
+          ->fields('n', array('nid'))
+          ->condition('n.type', 'share_ride')
+          ->condition('n.uid', $user->uid);
+        $result = $query->execute()->fetchAll();
         
-        $result = db_query("SELECT * FROM {node} WHERE type = ':type' 
-                            AND uid = ':uid'", 
-                           array(':type' => $type, ':uid' => $user->uid));
-
-        if (!empty($result['node'])) {
-          //--> Yes, they already have a post 
-          // @ToDo change this function to one that assumes there
-          //  is only one matching node.  Or, deal with multiple results
-          //  if we decide on multiple posts per person.
-          $nodes = node_load_multiple(array_keys($result['node']));
-          //print_r($nodes[1]);  a
-          //returns: An array of node objects indexed by nid.
-        }
-        
-        if (!isset($nodes)  || !($share_node = array_shift($nodes))) {
-           // Create new share post
+        if (!empty($result)) {
+          // share_ride node exist for this user
+          $share_node = node_load($result[0]->nid);
+        } else {
+          // Create new share post
           $share_node = (object) array(
             // This would be a good place to create the title, then just hide it.  
             // Get this error: Undefined property: stdClass::$name in verdant_share_block_view()
