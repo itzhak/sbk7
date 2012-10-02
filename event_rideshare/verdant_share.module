@@ -50,7 +50,6 @@ function verdant_share_block_view($block_name = '') {
         global $user;
 		  
         $type = 'share_ride';
-        $account = $user;
         $form_id = 'share_ride_node_form'; // item_node_form
         $share_node;
 
@@ -62,6 +61,10 @@ function verdant_share_block_view($block_name = '') {
           ->propertyCondition('type', $type)
           ->propertyCondition('uid', $user->uid)
           ->execute();
+        
+        $result = db_query("SELECT * FROM {node} WHERE type = ':type' 
+                            AND uid = ':uid'", 
+                           array(':type' => $type, ':uid' => $user->uid));
 
         if (!empty($result['node'])) {
           //--> Yes, they already have a post 
@@ -92,9 +95,11 @@ function verdant_share_block_view($block_name = '') {
         }
 
         $printable_form = drupal_get_form($form_id, $share_node);
-        $block['subject'] = t('My Rideshare');
+        $block['subject'] = t('My Rideshare'); 
         $block['content'] = array(
-          '#title' => t('Your post will act as your search parameters:'),
+          'title' => array(
+            '#markup' => t('Your post will act as your search parameters:'),
+          ),          
           '#prefix' => '<div id="verdant_rideshare">',
           '#suffix' => '</div>',
           'share_ride_form' => $printable_form,
@@ -103,26 +108,29 @@ function verdant_share_block_view($block_name = '') {
       } elseif (isset($user)) { // && !user_access('post rideshare'))
         $block['subject'] = t('Access denied');
         $block['content'] = array(
-          '#title' => t('You do not have permission to post a rideshare'),
+          '#markup' => t('You do not have permission to post a rideshare'),
         );
         
       } else { // if user is not logged in
-        // The user isn't logged in.  This is just a message and an extra
-        //  login block.
-        // It's ok to remove the drupal_render form or otherwise change text here  
+        // The user isn't logged in. 
         $block['subject'] = t('Your Rideshare Post');
-        //$block['content'] = array( // TODO continue here
-        $content = t("Please sign in to create a rideshare post.
-                     Your post will make it easier to search other people's posts:") .
-                   '<br/><br/>' . drupal_render(drupal_get_form('user_login_block')); 
+        $block['content'] = array(
+          'title' => array(
+            '#markup' => t('Please '),
+           ),             
+          'login_link' => array(
+            '#type' => 'link',
+            '#title' => 'sign in ',
+            '#href' => 'user/login',    
+          ),
+          'end_of_title' => array(
+            '#markup' => t('to create a rideshare post. Your post will make it
+                            easier to search other people\'s posts'),
+          ),
+        ); 
       }
 	  
-	  $blocks = array(
-	    'subject' => $subject,
-		  'content' => $content,
-	  );
-	  
-      return $blocks;
+      return $block;
     }
 }
 
