@@ -89,6 +89,8 @@ function verdant_share_block_view($block_name = '') {
           '#suffix' => '</div>',
           'share_ride_form' => $printable_form,
         );
+        $block['content']['#attached']['css'][] = drupal_get_path('module', 'verdant_share') . 
+                                                  '/css/verdant_share_extra_style.css';
         
       } elseif (isset($user)) { // && !user_access('post rideshare'))
         $block['subject'] = t('Access denied');
@@ -122,7 +124,6 @@ function verdant_share_block_view($block_name = '') {
 
 
 
-
 /**
  *  function verdant_share_menu
  *   The main pages have their urls create in the view -- easy for users 
@@ -134,39 +135,14 @@ function verdant_share_block_view($block_name = '') {
 function verdant_share_menu() {
   $items = array();
 
-  // ref: http://drupal.org/node/206761
-  // structure? config? what should the parent be?
-  // I think overall this is ok: if they can administer site config, it flies.
   $items['admin/structure/rideshare'] = array(
     'title' => 'Event Sharing: Ride-share',
     'description' => 'Settings for the event rideshare module',
     'page callback' => 'drupal_get_form',
-    'page arguments' => array('verdant_share_admin'), 
+    'page arguments' => array('verdant_share_admin_form'), 
     'access arguments' => array('administer site configuration'),
     'type' => MENU_NORMAL_ITEM,
   );
-
-
-  /* LETTING_THE_VIEW_CREATE_THE_MENUS_verdant_share_menu_NOT_USED 
-    The plan could change!  Or just erase this soon.
-
-  //Carpool map page  
-  $items['share/ride/map'] = array(
-    'title' => 'Rideshare Map',
-    'description' => 'Post, or search the map for a rideshare',
-    'page callback' => 'verdant_share_map_page',
-    'access arguments' => array('access content'), //!!! reimplement? 
-    'type' => MENU_NORMAL_ITEM
-  );
-
-  $items['share/ride/chart'] = array(
-    'title' => 'Rideshare Chart',
-    'description' => 'Post, or use the chart to sort possible rides',
-    'page callback' => 'verdant_share_chart_page',  // CHANGE !!!!! :s /map/chart
-    'access arguments' => array('access content'), //!!! reimplement? 
-    'type' => MENU_NORMAL_ITEM
-  ); 
-  */
 
   return $items;
 }
@@ -356,11 +332,6 @@ function verdant_share_date_filter() {
 function verdant_share_form_alter(&$form, $form_state, $form_id) {
 
   if ( $form_id == 'share_ride_node_form') {
-    // add some css ... might need this more often?
-    drupal_add_css(drupal_get_path('module', 'verdant_share') . 
-      '/css/verdant_share_extra_style.css');
-
-
     // Beginning effort with dates.  Need to set these values in config
     if ( $form['field_arrival_time']['und'][0]['#date_is_default'] ) {
       $form['field_arrival_time']['und'][0]['#default_value']['value'] = 
@@ -456,15 +427,12 @@ function limited_url() {
     // look at the location settings page, then see code used here:
     // http://vfit.net/sites/all/modules/location/location.admin.inc
 
-function verdant_share_admin() {
-  $form = array();
+function verdant_share_admin_form($form, &$form_state) {
 
-    $form['verdant_block_text'] = array(
+  $form['verdant_block_text'] = array(
     '#type' => 'textfield',
     '#title' => t('Ride Post Location'),
-    '#default_value' => 
-      variable_get('verdant_block_text', 'in the right sidebar'),
-    //'#maxlength' => 2,
+    '#default_value' => variable_get('verdant_block_text' ,'in the right sidebar'),
     '#description' => t("Adjust the help instructions for users:
     Where can users see the form to create their
     rideshare post, if they haven't entered one already?  
@@ -474,23 +442,31 @@ function verdant_share_admin() {
     '#required' => TRUE,
   );
 
+  
   // Set the arrival and departure default times
   // see: http://drupal.org/node/292667
+  
+  $format = 'Y-m-d H:i';
+  $timestamp = time(); /* get current time to set as default */
+  $date = format_date($timestamp, 'custom', $format, 
+                      variable_get('date_default_timezone', 0));
+   
   $form['verdant_arrive_time'] = array(
     '#type' => 'date_select',
     '#title' => t('Conference default arrival/opening day'),
     '#required' => FALSE, // but default given anyway
-    '#date_year_range' => '-3:+6',
-    '#default_value' =>  variable_get('verdant_arrive_time', 
-      '2012-3-19 8:00:00'),
+    '#date_year_range' => '-3:+3',
+    '#default_value' => variable_get('verdant_arrive_time', $date),
+    '#date_format' => $format,
   );
+  
   $form['verdant_departure_time'] = array(
     '#type' => 'date_select',
     '#title' => t('Conference default departure/closing day'),
     '#required' => FALSE, // but default given anyway
-    '#date_year_range' => '-3:+6',
-    '#default_value' =>  variable_get('verdant_departure_time',
-      '2012-3-22 21:00:00'), 
+    '#date_year_range' => '-3:+3',
+    '#default_value' => variable_get('verdant_departure_time', $date),
+    '#date_format' => $format,
   );
 
   /* Begining of thinking about putting location in config
@@ -507,7 +483,7 @@ function verdant_share_admin() {
   );
   */
 
-return system_settings_form($form);
+  return system_settings_form($form);
 }
 
 

@@ -37,7 +37,7 @@
 
 .form-item-field-arrival-time-und-0-value-date,
 .form-item-field-departure-time-und-0-value-date {
-	float: left;
+	float: left; /* LTR */
 }
 #verdant_rideshare input#edit-field-arrival-time-und-0-value-timeEntry-popup-1,
 #verdant_rideshare input#edit-field-departure-time-und-0-value-timeEntry-popup-1{
