@@ -2,7 +2,7 @@ For drupal 7.15:
 Installing drupal and all modules:
 1. drush dl drupal
 2. create new database (for example rideshare7)
-3. cd drupal-7.15; drush site-install standard --account-name=admin --account-pass=goongoor --db-url=mysql://root:Yahad66@localhost/rideshare7
+3. cd drupal-7.15; drush site-install standard --account-name=admin --account-pass= --db-url=mysql://root:@localhost/rideshare7
 4. download event_rideshare module manually and fix bug number 1.
 5. download all other modules needed by rideshare by next command: drush dl features views date date_views flag gmap ctools location
    for now the version that used is (features (7.x-1.0), views (7.x-3.5), date (7.x-2.6), flag (7.x-2.0-beta9), gmap (7.x-2.x-dev),
